@@ -1,5 +1,5 @@
-import eventlet
-eventlet.monkey_patch()
+from gevent import monkey
+monkey.patch_all()
 
 from flask import Flask, render_template, request, jsonify, redirect, url_for
 from flask_socketio import SocketIO, emit
@@ -11,6 +11,7 @@ import json
 import time
 import os
 import threading
+from gevent import sleep
 
 app = Flask(__name__)
 app.config['SECRET_KEY'] = os.environ.get('SECRET_KEY', 'your-secret-key')
@@ -214,7 +215,7 @@ def start_game_loop():
                             'player_current_score': game_state['player_current_score']
                         })
                         print(f"Betting phase - Time left: {i}")
-                        time.sleep(1)
+                        sleep(1)
                     except Exception as e:
                         print(f"Error during betting phase: {str(e)}")
                         continue
@@ -237,7 +238,7 @@ def start_game_loop():
                     'player_current_score': game_state['player_current_score']
                 })
                 
-                time.sleep(2)
+                sleep(2)
                 
                 # 判斷是否需要補牌
                 player_draw, banker_draw = should_draw_third_card(
@@ -252,7 +253,7 @@ def start_game_loop():
                         'phase': 'dealing',
                         'player_current_score': game_state['player_current_score']
                     })
-                    time.sleep(1)
+                    sleep(1)
                 
                 if banker_draw:
                     game_state['banker_cards'].append(game_state['deck'].pop())
@@ -261,7 +262,7 @@ def start_game_loop():
                         'phase': 'dealing',
                         'banker_current_score': game_state['banker_current_score']
                     })
-                    time.sleep(1)
+                    sleep(1)
                 
                 # 計算結果
                 game_state['winner'] = determine_winner(
@@ -306,11 +307,11 @@ def start_game_loop():
                 update_leaderboard()
                 
                 # 等待一段時間後開始新一局
-                time.sleep(5)
+                sleep(5)
                 
         except Exception as e:
             print(f"Error in game loop: {str(e)}")
-            time.sleep(1)
+            sleep(1)
             continue
 
 def update_leaderboard():

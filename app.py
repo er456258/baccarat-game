@@ -12,8 +12,16 @@ import time
 import os
 
 app = Flask(__name__)
-app.config['SECRET_KEY'] = 'your-secret-key'
-app.config['SQLALCHEMY_DATABASE_URI'] = 'sqlite:///baccarat.db'
+app.config['SECRET_KEY'] = os.environ.get('SECRET_KEY', 'your-secret-key')
+
+# 根據環境設置數據庫 URL
+if os.environ.get('RENDER'):
+    # Render.com 環境，使用 SQLite 文件
+    app.config['SQLALCHEMY_DATABASE_URI'] = 'sqlite:///baccarat.db'
+else:
+    # 本地開發環境
+    app.config['SQLALCHEMY_DATABASE_URI'] = 'sqlite:///baccarat.db'
+
 app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
 
 db = SQLAlchemy(app)
@@ -416,6 +424,22 @@ def init_deck():
 @app.route('/api/game/state')
 def get_game_state():
     return jsonify(game_state)
+
+# 確保數據庫目錄存在
+def ensure_db_dir_exists():
+    db_path = os.path.dirname(app.config['SQLALCHEMY_DATABASE_URI'].replace('sqlite:///', ''))
+    if db_path and not os.path.exists(db_path):
+        os.makedirs(db_path)
+
+# 初始化數據庫
+def init_db():
+    with app.app_context():
+        ensure_db_dir_exists()
+        db.create_all()
+        print("Database tables created successfully!")
+
+# 在應用啟動時初始化數據庫
+init_db()
 
 if __name__ == '__main__':
     with app.app_context():

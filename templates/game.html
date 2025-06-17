@@ -567,22 +567,9 @@
         <h3>排行榜</h3>
         <div id="leaderboard-list"></div>
     </div>
-
-    <!-- 統一的遊戲階段顯示區域，下注時顯示洗牌動畫 -->
-    <div id="game-phase-overlay" class="game-phase-overlay">
-        <h2 id="game-phase-text"></h2>
-        <div id="shuffle-animation" class="shuffle-animation" style="display: none;">🃏</div>
-    </div>
-
-    <!-- 遊戲結果覆蓋層 -->
-    <div id="game-result-overlay" class="game-result-overlay" style="display: none;">
-        <h2 id="winner-text"></h2>
-        <p id="player-final-score"></p>
-        <p id="banker-final-score"></p>
-        <p id="result-profit-loss"></p>
-        <button id="play-again-button">再玩一次</button>
-    </div>
 </div>
+
+<div class="game-phase-overlay" id="game-phase-overlay"></div>
 {% endblock %}
 
 {% block extra_js %}
@@ -600,21 +587,38 @@
 
         const bettingArea = document.getElementById('betting-area');
         const countdownElement = document.getElementById('countdown');
+        const phaseOverlay = document.getElementById('game-phase-overlay');
         let currentPhase = 'waiting';
+
+        function showPhaseMessage(message) {
+            phaseOverlay.textContent = message;
+            phaseOverlay.classList.add('active');
+            setTimeout(() => {
+                phaseOverlay.classList.remove('active');
+            }, 3000);
+        }
 
         socket.on('connect', function() {
             console.log('Connected to server');
             document.getElementById('connection-status').textContent = '已連線';
+            document.getElementById('connection-status').style.color = '#4CAF50';
         });
 
         socket.on('connect_error', function(error) {
             console.log('Connection error:', error);
             document.getElementById('connection-status').textContent = '連線錯誤';
+            document.getElementById('connection-status').style.color = '#ff0000';
         });
 
         socket.on('disconnect', function() {
             console.log('Disconnected from server');
             document.getElementById('connection-status').textContent = '已斷線';
+            document.getElementById('connection-status').style.color = '#ff0000';
+            
+            // 嘗試重新連接
+            setTimeout(() => {
+                socket.connect();
+            }, 1000);
         });
 
         socket.on('game_state', function(state) {
@@ -638,11 +642,31 @@
             if (state.player_current_score !== undefined) {
                 document.getElementById('player-score').textContent = state.player_current_score;
             }
+
+            // 顯示遊戲階段消息
+            switch(state.phase) {
+                case 'betting':
+                    showPhaseMessage('下注階段開始！');
+                    break;
+                case 'dealing':
+                    showPhaseMessage('發牌中...');
+                    break;
+                case 'result':
+                    if (state.winner) {
+                        showPhaseMessage(`${state.winner === 'banker' ? '莊家' : state.winner === 'player' ? '閒家' : '和局'}獲勝！`);
+                    }
+                    break;
+            }
         });
 
         socket.on('balance_update', function(data) {
             console.log('Balance update:', data);
             document.getElementById('balance').textContent = data.balance;
+        });
+
+        socket.on('error', function(data) {
+            console.error('Error:', data);
+            showPhaseMessage(data.message);
         });
 
         socket.on('leaderboard_update', function(data) {
@@ -670,9 +694,20 @@
 
         window.placeBet = function(type, amount) {
             console.log('Placing bet:', type, amount);
+            if (currentPhase !== 'betting') {
+                showPhaseMessage('現在不是下注時間！');
+                return;
+            }
+            
+            amount = parseInt(amount);
+            if (isNaN(amount) || amount <= 0) {
+                showPhaseMessage('請輸入有效的下注金額！');
+                return;
+            }
+
             socket.emit('place_bet', {
                 type: type,
-                amount: parseInt(amount)
+                amount: amount
             });
         };
 
@@ -684,6 +719,12 @@
                 entry.textContent = `${index + 1}. ${item.username}: ${item.total_winnings}`;
                 leaderboardList.appendChild(entry);
             });
+        }
+
+        // 初始化時檢查連接狀態
+        if (socket.connected) {
+            document.getElementById('connection-status').textContent = '已連線';
+            document.getElementById('connection-status').style.color = '#4CAF50';
         }
     });
 </script>

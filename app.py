@@ -21,7 +21,9 @@ socketio = SocketIO(app,
                    cors_allowed_origins="*",
                    async_mode='eventlet',
                    ping_timeout=60,
-                   ping_interval=25)
+                   ping_interval=25,
+                   logger=True,
+                   engineio_logger=True)
 login_manager = LoginManager()
 login_manager.init_app(app)
 login_manager.login_view = 'login'
@@ -176,45 +178,129 @@ def game_loop():
                 game_state['results'] = None
                 game_state['player_current_score'] = 0
                 game_state['banker_current_score'] = 0
+                game_state['winner'] = None
 
                 # 通知所有玩家新一局開始
                 try:
-                    socketio.emit('new_round', {
+                    socketio.emit('game_state', {
+                        'phase': 'betting',
+                        'time_left': 20,
                         'round_number': game_state['round_number'],
-                        'time_left': game_state['time_left']
-                    }, namespace='/')
-                    print(f"Emitted 'new_round'. Round: {game_state['round_number']}")
+                        'banker_current_score': 0,
+                        'player_current_score': 0
+                    })
+                    print(f"Emitted game state for new round {game_state['round_number']}")
                 except Exception as e:
-                    print(f"Error emitting new_round: {str(e)}")
+                    print(f"Error emitting new round state: {str(e)}")
 
                 # 下注階段
                 for i in range(20, 0, -1):
+                    game_state['time_left'] = i
                     try:
-                        game_state['time_left'] = i
-                        socketio.emit('game_state', game_state, namespace='/')
+                        socketio.emit('game_state', {
+                            'phase': 'betting',
+                            'time_left': i,
+                            'banker_current_score': game_state['banker_current_score'],
+                            'player_current_score': game_state['player_current_score']
+                        })
                         print(f"Betting phase - Time left: {i}")
                         eventlet.sleep(1)
                     except Exception as e:
                         print(f"Error during betting phase: {str(e)}")
-                        eventlet.sleep(1)
                         continue
 
                 # 發牌階段
-                try:
-                    print("Starting dealing phase...")
-                    game_state['phase'] = 'dealing'
-                    socketio.emit('game_state', game_state, namespace='/')
+                game_state['phase'] = 'dealing'
+                socketio.emit('game_state', {'phase': 'dealing'})
+                
+                # 發前兩張牌
+                for _ in range(2):
+                    game_state['player_cards'].append(game_state['deck'].pop())
+                    game_state['banker_cards'].append(game_state['deck'].pop())
+                
+                game_state['player_current_score'] = calculate_score(game_state['player_cards'])
+                game_state['banker_current_score'] = calculate_score(game_state['banker_cards'])
+                
+                socketio.emit('game_state', {
+                    'phase': 'dealing',
+                    'banker_current_score': game_state['banker_current_score'],
+                    'player_current_score': game_state['player_current_score']
+                })
+                
+                eventlet.sleep(2)
+                
+                # 判斷是否需要補牌
+                player_draw, banker_draw = should_draw_third_card(
+                    game_state['player_current_score'],
+                    game_state['banker_current_score']
+                )
+                
+                if player_draw:
+                    game_state['player_cards'].append(game_state['deck'].pop())
+                    game_state['player_current_score'] = calculate_score(game_state['player_cards'])
+                    socketio.emit('game_state', {
+                        'phase': 'dealing',
+                        'player_current_score': game_state['player_current_score']
+                    })
                     eventlet.sleep(1)
-
-                    # 發牌邏輯...
-                    # 這裡保留原有的發牌邏輯
-                except Exception as e:
-                    print(f"Error during dealing phase: {str(e)}")
-
-                eventlet.sleep(1)
+                
+                if banker_draw:
+                    game_state['banker_cards'].append(game_state['deck'].pop())
+                    game_state['banker_current_score'] = calculate_score(game_state['banker_cards'])
+                    socketio.emit('game_state', {
+                        'phase': 'dealing',
+                        'banker_current_score': game_state['banker_current_score']
+                    })
+                    eventlet.sleep(1)
+                
+                # 計算結果
+                game_state['winner'] = determine_winner(
+                    game_state['banker_current_score'],
+                    game_state['player_current_score']
+                )
+                
+                # 結算階段
+                game_state['phase'] = 'result'
+                socketio.emit('game_state', {
+                    'phase': 'result',
+                    'winner': game_state['winner'],
+                    'banker_current_score': game_state['banker_current_score'],
+                    'player_current_score': game_state['player_current_score']
+                })
+                
+                # 處理派彩
+                for user_id, bets in game_state['bets'].items():
+                    total_payout = 0
+                    for bet_type, amount in bets.items():
+                        payout = calculate_payout(
+                            bet_type,
+                            amount,
+                            game_state['winner'],
+                            game_state['banker_cards'],
+                            game_state['player_cards']
+                        )
+                        total_payout += payout
+                    
+                    if total_payout > 0:
+                        user = User.query.get(user_id)
+                        if user:
+                            user.balance += total_payout
+                            user.total_winnings += (total_payout - sum(bets.values()))
+                            db.session.commit()
+                            if user_id in connected_users_sids:
+                                socketio.emit('balance_update', 
+                                            {'balance': user.balance},
+                                            room=connected_users_sids[user_id])
+                
+                # 更新排行榜
+                update_leaderboard()
+                
+                # 等待一段時間後開始新一局
+                eventlet.sleep(5)
+                
             except Exception as e:
                 print(f"Error in game loop: {str(e)}")
-                eventlet.sleep(5)  # 錯誤發生時等待5秒再繼續
+                eventlet.sleep(1)
                 continue
 
 def update_leaderboard():
@@ -264,12 +350,23 @@ def game():
 @socketio.on('connect')
 @login_required
 def handle_connect():
-    # 將用戶ID映射到Socket.IO的session ID
+    """處理用戶連接"""
+    print(f"User {current_user.id} connected")
     connected_users_sids[current_user.id] = request.sid
-    print(f"User {current_user.username} connected with SID: {request.sid}")
-    # 首次連線時發送當前用戶餘額，確保同步
+    
+    # 發送當前遊戲狀態
+    emit('game_state', {
+        'phase': game_state['phase'],
+        'time_left': game_state['time_left'],
+        'banker_current_score': game_state['banker_current_score'],
+        'player_current_score': game_state['player_current_score']
+    })
+    
+    # 發送用戶餘額
     emit('balance_update', {'balance': current_user.balance})
-    update_leaderboard() # 更新排行榜給新連線的用戶
+    
+    # 更新排行榜
+    update_leaderboard()
 
 @socketio.on('disconnect')
 @login_required
@@ -282,35 +379,41 @@ def handle_disconnect():
 @socketio.on('place_bet')
 @login_required
 def handle_bet(data):
+    """處理下注請求"""
+    print(f"Received bet from user {current_user.id}: {data}")
+    
     if game_state['phase'] != 'betting':
+        emit('error', {'message': '現在不是下注時間'})
         return
     
-    amount = int(data['amount'])
-    bet_type = data['type']
-    
-    if amount < 500:
-        emit('error', {'message': '最低投注額為500'})
-        return
-    
-    if amount > current_user.balance:
-        emit('error', {'message': '餘額不足'})
-        return
-    
-    # 扣除下注金額
-    current_user.balance -= amount
-    db.session.commit()
-    
-    game_state['bets'][current_user.id] = {
-        'amount': amount,
-        'type': bet_type
-    }
-    
-    emit('bet_placed', {
-        'user_id': current_user.id,
-        'amount': amount,
-        'type': bet_type,
-        'balance': current_user.balance
-    }, broadcast=True)
+    try:
+        bet_type = data['type']
+        amount = int(data['amount'])
+        
+        if amount <= 0:
+            emit('error', {'message': '下注金額必須大於0'})
+            return
+            
+        if current_user.balance < amount:
+            emit('error', {'message': '餘額不足'})
+            return
+            
+        # 更新用戶下注記錄
+        if current_user.id not in game_state['bets']:
+            game_state['bets'][current_user.id] = {}
+        game_state['bets'][current_user.id][bet_type] = amount
+        
+        # 扣除下注金額
+        current_user.balance -= amount
+        db.session.commit()
+        
+        # 通知用戶餘額更新
+        emit('balance_update', {'balance': current_user.balance})
+        print(f"Bet placed successfully: {bet_type}, {amount}")
+        
+    except Exception as e:
+        print(f"Error handling bet: {str(e)}")
+        emit('error', {'message': '下注失敗，請稍後再試'})
 
 def init_deck():
     """初始化牌組"""

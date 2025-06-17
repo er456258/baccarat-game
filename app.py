@@ -25,7 +25,8 @@ socketio = SocketIO(app,
                    ping_timeout=60,
                    ping_interval=25,
                    logger=True,
-                   engineio_logger=True)
+                   engineio_logger=True,
+                   message_queue=None)
 login_manager = LoginManager()
 login_manager.init_app(app)
 login_manager.login_view = 'login'

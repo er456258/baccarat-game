@@ -1,4 +1,10 @@
 bind = "0.0.0.0:10000"
-workers = 4
-worker_class = "eventlet"
-timeout = 120 
+workers = 1
+worker_class = "gevent_websocket.gunicorn.workers.GeventWebSocketWorker"
+timeout = 120
+keepalive = 120
+worker_connections = 1000
+forwarded_allow_ips = '*'
+proxy_allow_ips = '*'
+preload_app = True
+reload = True 

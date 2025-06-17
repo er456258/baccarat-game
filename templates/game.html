@@ -491,67 +491,83 @@
 
 {% block content %}
 <div class="game-table">
-    <div class="timer">下注時間: <span id="time-left">20</span>秒</div>
     <div class="user-info">
-        用戶名: {{ current_user.username }}<br>
-        餘額: <span id="balance">{{ current_user.balance }}</span><br>
-        連線狀態: <span id="connection-status">未連接</span>
+        用戶名：{{ username }}<br>
+        餘額：<span id="balance">{{ balance }}</span><br>
+        連線狀態：<span id="connection-status">未連線</span>
     </div>
     
-    <div class="cards-area">
-        <div class="banker-area">
-            <h2>莊家</h2>
-            <div id="banker-cards" class="cards"></div>
-            <div class="score" id="banker-score"></div>
-        </div>
-        <div class="player-area">
-            <h2>閒家</h2>
-            <div id="player-cards" class="cards"></div>
-            <div class="score" id="player-score"></div>
-        </div>
+    <div class="timer">
+        下注時間：<span id="countdown">20</span>秒
     </div>
 
+<<<<<<< HEAD
     <div id="betting-area" class="betting-area" style="display: flex;">
         <div class="bet-option" data-type="banker">
             <h3>莊</h3>
             <div class="bet-amount">
                 <input type="number" min="500" step="100" value="500">
                 <button class="btn">下注</button>
+=======
+    <div class="game-area">
+        <div class="cards-area">
+            <div class="banker-area">
+                <h2>莊家</h2>
+                <div class="banker-cards" id="banker-cards">
+                    <div class="score">莊家點數：<span id="banker-score">0</span></div>
+                </div>
+            </div>
+            <div class="player-area">
+                <h2>閒家</h2>
+                <div class="player-cards" id="player-cards">
+                    <div class="score">閒家點數：<span id="player-score">0</span></div>
+                </div>
+>>>>>>> master
             </div>
         </div>
-        <div class="bet-option" data-type="player">
-            <h3>閒</h3>
-            <div class="bet-amount">
-                <input type="number" min="500" step="100" value="500">
-                <button class="btn">下注</button>
+
+        <div class="betting-area" id="betting-area">
+            <div class="bet-option" data-type="banker">
+                <h3>莊</h3>
+                <div class="bet-amount">
+                    <input type="number" min="100" step="100" value="500">
+                    <button onclick="placeBet('banker', this.parentElement.querySelector('input').value)">下注</button>
+                </div>
             </div>
-        </div>
-        <div class="bet-option" data-type="tie">
-            <h3>和</h3>
-            <div class="bet-amount">
-                <input type="number" min="500" step="100" value="500">
-                <button class="btn">下注</button>
+            <div class="bet-option" data-type="player">
+                <h3>閒</h3>
+                <div class="bet-amount">
+                    <input type="number" min="100" step="100" value="500">
+                    <button onclick="placeBet('player', this.parentElement.querySelector('input').value)">下注</button>
+                </div>
             </div>
-        </div>
-        <div class="bet-option" data-type="banker_pair">
-            <h3>莊對子</h3>
-            <div class="bet-amount">
-                <input type="number" min="500" step="100" value="500">
-                <button class="btn">下注</button>
+            <div class="bet-option" data-type="tie">
+                <h3>和</h3>
+                <div class="bet-amount">
+                    <input type="number" min="100" step="100" value="500">
+                    <button onclick="placeBet('tie', this.parentElement.querySelector('input').value)">下注</button>
+                </div>
             </div>
-        </div>
-        <div class="bet-option" data-type="player_pair">
-            <h3>閒對子</h3>
-            <div class="bet-amount">
-                <input type="number" min="500" step="100" value="500">
-                <button class="btn">下注</button>
+            <div class="bet-option" data-type="banker_pair">
+                <h3>莊對子</h3>
+                <div class="bet-amount">
+                    <input type="number" min="100" step="100" value="500">
+                    <button onclick="placeBet('banker_pair', this.parentElement.querySelector('input').value)">下注</button>
+                </div>
             </div>
-        </div>
-        <div class="bet-option" data-type="lucky_six">
-            <h3>幸運六</h3>
-            <div class="bet-amount">
-                <input type="number" min="500" step="100" value="500">
-                <button class="btn">下注</button>
+            <div class="bet-option" data-type="player_pair">
+                <h3>閒對子</h3>
+                <div class="bet-amount">
+                    <input type="number" min="100" step="100" value="500">
+                    <button onclick="placeBet('player_pair', this.parentElement.querySelector('input').value)">下注</button>
+                </div>
+            </div>
+            <div class="bet-option" data-type="lucky_six">
+                <h3>幸運六</h3>
+                <div class="bet-amount">
+                    <input type="number" min="100" step="100" value="500">
+                    <button onclick="placeBet('lucky_six', this.parentElement.querySelector('input').value)">下注</button>
+                </div>
             </div>
         </div>
     </div>
@@ -562,6 +578,7 @@
     </div>
 </div>
 
+<<<<<<< HEAD
 <div id="game-phase-overlay" class="game-phase-overlay" style="display: none;">
     <h2 id="game-phase-text"></h2>
     <div id="shuffle-animation" class="shuffle-animation" style="display: none;">🃏</div>
@@ -574,11 +591,15 @@
     <p id="result-profit-loss"></p>
 </div>
 
+=======
+<div class="game-phase-overlay" id="game-phase-overlay"></div>
+>>>>>>> master
 {% endblock %}
 
 {% block extra_js %}
 <script src="https://cdnjs.cloudflare.com/ajax/libs/socket.io/4.0.1/socket.io.js"></script>
 <script>
+<<<<<<< HEAD
 document.addEventListener('DOMContentLoaded', function() {
     const socket = io({
         transports: ['websocket'],
@@ -651,6 +672,158 @@ document.addEventListener('DOMContentLoaded', function() {
         }
         if (data.banker_score !== undefined) {
             document.getElementById('banker-score').textContent = `點數: ${data.banker_score}`;
+=======
+    document.addEventListener('DOMContentLoaded', function() {
+        const socket = io({
+            transports: ['websocket'],
+            upgrade: false,
+            reconnection: true,
+            reconnectionAttempts: 5,
+            reconnectionDelay: 1000,
+            timeout: 60000
+        });
+
+        const bettingArea = document.getElementById('betting-area');
+        const countdownElement = document.getElementById('countdown');
+        const phaseOverlay = document.getElementById('game-phase-overlay');
+        let currentPhase = 'waiting';
+
+        function showPhaseMessage(message) {
+            phaseOverlay.textContent = message;
+            phaseOverlay.classList.add('active');
+            setTimeout(() => {
+                phaseOverlay.classList.remove('active');
+            }, 3000);
+        }
+
+        socket.on('connect', function() {
+            console.log('Connected to server');
+            document.getElementById('connection-status').textContent = '已連線';
+            document.getElementById('connection-status').style.color = '#4CAF50';
+        });
+
+        socket.on('connect_error', function(error) {
+            console.log('Connection error:', error);
+            document.getElementById('connection-status').textContent = '連線錯誤';
+            document.getElementById('connection-status').style.color = '#ff0000';
+        });
+
+        socket.on('disconnect', function() {
+            console.log('Disconnected from server');
+            document.getElementById('connection-status').textContent = '已斷線';
+            document.getElementById('connection-status').style.color = '#ff0000';
+            
+            // 嘗試重新連接
+            setTimeout(() => {
+                socket.connect();
+            }, 1000);
+        });
+
+        socket.on('game_state', function(state) {
+            console.log('Received game state:', state);
+            
+            // 更新倒計時
+            if (state.time_left !== undefined) {
+                countdownElement.textContent = state.time_left;
+            }
+
+            // 更新遊戲階段
+            if (state.phase !== currentPhase) {
+                currentPhase = state.phase;
+                handlePhaseChange(state.phase);
+            }
+
+            // 更新分數
+            if (state.banker_current_score !== undefined) {
+                document.getElementById('banker-score').textContent = state.banker_current_score;
+            }
+            if (state.player_current_score !== undefined) {
+                document.getElementById('player-score').textContent = state.player_current_score;
+            }
+
+            // 顯示遊戲階段消息
+            switch(state.phase) {
+                case 'betting':
+                    showPhaseMessage('下注階段開始！');
+                    break;
+                case 'dealing':
+                    showPhaseMessage('發牌中...');
+                    break;
+                case 'result':
+                    if (state.winner) {
+                        showPhaseMessage(`${state.winner === 'banker' ? '莊家' : state.winner === 'player' ? '閒家' : '和局'}獲勝！`);
+                    }
+                    break;
+            }
+        });
+
+        socket.on('balance_update', function(data) {
+            console.log('Balance update:', data);
+            document.getElementById('balance').textContent = data.balance;
+        });
+
+        socket.on('error', function(data) {
+            console.error('Error:', data);
+            showPhaseMessage(data.message);
+        });
+
+        socket.on('leaderboard_update', function(data) {
+            console.log('Leaderboard update:', data);
+            updateLeaderboard(data);
+        });
+
+        function handlePhaseChange(phase) {
+            console.log('Phase changed to:', phase);
+            if (phase === 'betting') {
+                bettingArea.style.display = 'flex';
+                enableAllBetButtons(true);
+            } else {
+                bettingArea.style.display = 'none';
+                enableAllBetButtons(false);
+            }
+        }
+
+        function enableAllBetButtons(enable) {
+            const buttons = document.querySelectorAll('.bet-amount button');
+            buttons.forEach(button => {
+                button.disabled = !enable;
+            });
+        }
+
+        window.placeBet = function(type, amount) {
+            console.log('Placing bet:', type, amount);
+            if (currentPhase !== 'betting') {
+                showPhaseMessage('現在不是下注時間！');
+                return;
+            }
+            
+            amount = parseInt(amount);
+            if (isNaN(amount) || amount <= 0) {
+                showPhaseMessage('請輸入有效的下注金額！');
+                return;
+            }
+
+            socket.emit('place_bet', {
+                type: type,
+                amount: amount
+            });
+        };
+
+        function updateLeaderboard(data) {
+            const leaderboardList = document.getElementById('leaderboard-list');
+            leaderboardList.innerHTML = '';
+            data.forEach((item, index) => {
+                const entry = document.createElement('div');
+                entry.textContent = `${index + 1}. ${item.username}: ${item.total_winnings}`;
+                leaderboardList.appendChild(entry);
+            });
+        }
+
+        // 初始化時檢查連接狀態
+        if (socket.connected) {
+            document.getElementById('connection-status').textContent = '已連線';
+            document.getElementById('connection-status').style.color = '#4CAF50';
+>>>>>>> master
         }
     });
 

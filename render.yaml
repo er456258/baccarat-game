@@ -16,6 +16,6 @@ services:
       - key: PORT
         value: 10000
       - key: GUNICORN_CMD_ARGS
-        value: "--worker-class gevent --workers 1 --bind 0.0.0.0:10000 --timeout 120 --keep-alive 120"
+        value: "--worker-class gevent_websocket.gunicorn.workers.GeventWebSocketWorker --workers 1 --bind 0.0.0.0:10000 --timeout 120 --keep-alive 120"
     healthCheckPath: /
     numInstances: 1 

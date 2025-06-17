@@ -1,6 +1,6 @@
 bind = "0.0.0.0:10000"
 workers = 1
-worker_class = "gevent"
+worker_class = "gevent_websocket.gunicorn.workers.GeventWebSocketWorker"
 timeout = 120
 keepalive = 120
 worker_connections = 1000

@@ -3,7 +3,7 @@ services:
     name: baccarat-game
     env: python
     buildCommand: pip install -r requirements.txt
-    startCommand: gunicorn -c gunicorn_config.py app:app
+    startCommand: python app.py
     envVars:
       - key: PYTHON_VERSION
         value: 3.10.0
@@ -13,5 +13,7 @@ services:
         value: production
       - key: WEB_CONCURRENCY
         value: 1
+      - key: PORT
+        value: 10000
     healthCheckPath: /
     numInstances: 1 

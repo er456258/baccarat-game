@@ -10,6 +10,7 @@ import random
 import json
 import time
 import os
+import threading
 
 app = Flask(__name__)
 app.config['SECRET_KEY'] = os.environ.get('SECRET_KEY', 'your-secret-key')
@@ -64,6 +65,9 @@ PAYOUT_RATES = {
 
 # 用於追蹤用戶的 session ID
 connected_users_sids = {}
+
+# 用於追蹤遊戲循環是否運行
+game_loop_running = False
 
 def calculate_score(cards):
     """計算牌面點數"""
@@ -160,12 +164,18 @@ def calculate_payout(bet_type, amount, winner, banker_cards, player_cards):
     
     return payout
 
-def game_loop():
-    """遊戲主循環"""
-    print("Starting game loop...")
-    with app.app_context():
-        while True:
-            try:
+def start_game_loop():
+    """啟動遊戲循環的函數"""
+    global game_loop_running
+    if game_loop_running:
+        return
+    
+    game_loop_running = True
+    print("Starting game loop thread...")
+    
+    while True:
+        try:
+            with app.app_context():
                 # 開始新一局
                 print("Starting new round...")
                 game_state['phase'] = 'betting'
@@ -204,7 +214,7 @@ def game_loop():
                             'player_current_score': game_state['player_current_score']
                         })
                         print(f"Betting phase - Time left: {i}")
-                        eventlet.sleep(1)
+                        time.sleep(1)
                     except Exception as e:
                         print(f"Error during betting phase: {str(e)}")
                         continue
@@ -227,7 +237,7 @@ def game_loop():
                     'player_current_score': game_state['player_current_score']
                 })
                 
-                eventlet.sleep(2)
+                time.sleep(2)
                 
                 # 判斷是否需要補牌
                 player_draw, banker_draw = should_draw_third_card(
@@ -242,7 +252,7 @@ def game_loop():
                         'phase': 'dealing',
                         'player_current_score': game_state['player_current_score']
                     })
-                    eventlet.sleep(1)
+                    time.sleep(1)
                 
                 if banker_draw:
                     game_state['banker_cards'].append(game_state['deck'].pop())
@@ -251,7 +261,7 @@ def game_loop():
                         'phase': 'dealing',
                         'banker_current_score': game_state['banker_current_score']
                     })
-                    eventlet.sleep(1)
+                    time.sleep(1)
                 
                 # 計算結果
                 game_state['winner'] = determine_winner(
@@ -296,12 +306,12 @@ def game_loop():
                 update_leaderboard()
                 
                 # 等待一段時間後開始新一局
-                eventlet.sleep(5)
+                time.sleep(5)
                 
-            except Exception as e:
-                print(f"Error in game loop: {str(e)}")
-                eventlet.sleep(1)
-                continue
+        except Exception as e:
+            print(f"Error in game loop: {str(e)}")
+            time.sleep(1)
+            continue
 
 def update_leaderboard():
     """更新排行榜"""
@@ -315,8 +325,19 @@ def update_leaderboard():
 def load_user(user_id):
     return User.query.get(int(user_id))
 
+# 在應用啟動時啟動遊戲循環
+@app.before_first_request
+def initialize_game():
+    """在第一個請求之前初始化遊戲"""
+    if not game_loop_running:
+        thread = threading.Thread(target=start_game_loop)
+        thread.daemon = True
+        thread.start()
+
 @app.route('/')
 def index():
+    if current_user.is_authenticated:
+        return redirect(url_for('game'))
     return render_template('index.html')
 
 @app.route('/login', methods=['GET', 'POST'])
@@ -345,10 +366,9 @@ def register():
 @app.route('/game')
 @login_required
 def game():
-    return render_template('game.html')
+    return render_template('game.html', username=current_user.username, balance=current_user.balance)
 
 @socketio.on('connect')
-@login_required
 def handle_connect():
     """處理用戶連接"""
     print(f"User {current_user.id} connected")
@@ -434,9 +454,8 @@ def get_game_state():
     return jsonify(game_state)
 
 if __name__ == '__main__':
-    print("Starting the application...")
-    try:
-        eventlet.spawn(game_loop)
-        socketio.run(app, debug=True, host='0.0.0.0', port=int(os.environ.get('PORT', 5000)))
-    except Exception as e:
-        print(f"Error starting the application: {str(e)}") 
+    with app.app_context():
+        db.create_all()
+    
+    port = int(os.environ.get('PORT', 5000))
+    socketio.run(app, debug=True, host='0.0.0.0', port=port) 

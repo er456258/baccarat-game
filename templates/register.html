@@ -1,0 +1,25 @@
+{% extends "base.html" %}
+
+{% block content %}
+<div class="register-container" style="text-align: center; margin-top: 100px;">
+    <h1>註冊</h1>
+    <form method="POST" action="{{ url_for('register') }}" style="max-width: 400px; margin: 0 auto;">
+        <div style="margin-bottom: 20px;">
+            <input type="text" name="username" placeholder="用戶名" required 
+                   style="width: 100%; padding: 10px; font-family: 'Press Start 2P', cursive;">
+        </div>
+        <div style="margin-bottom: 20px;">
+            <input type="password" name="password" placeholder="密碼" required 
+                   style="width: 100%; padding: 10px; font-family: 'Press Start 2P', cursive;">
+        </div>
+        <div style="margin-bottom: 20px;">
+            <input type="password" name="confirm_password" placeholder="確認密碼" required 
+                   style="width: 100%; padding: 10px; font-family: 'Press Start 2P', cursive;">
+        </div>
+        <button type="submit" class="btn">註冊</button>
+    </form>
+    <p style="margin-top: 20px;">
+        已有帳號？ <a href="{{ url_for('login') }}" style="color: var(--secondary-color);">登入</a>
+    </p>
+</div>
+{% endblock %} 

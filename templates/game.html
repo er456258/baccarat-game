@@ -511,7 +511,7 @@
         </div>
     </div>
 
-    <div id="betting-area" class="betting-area">
+    <div id="betting-area" class="betting-area" style="display: flex;">
         <div class="bet-option" data-type="banker">
             <h3>莊</h3>
             <div class="bet-amount">
@@ -560,452 +560,225 @@
         <h3>排行榜</h3>
         <div id="leaderboard-list"></div>
     </div>
-
-    <!-- 統一的遊戲階段顯示區域，下注時顯示洗牌動畫 -->
-    <div id="game-phase-overlay" class="game-phase-overlay">
-        <h2 id="game-phase-text"></h2>
-        <div id="shuffle-animation" class="shuffle-animation" style="display: none;">🃏</div>
-    </div>
-
-    <!-- 遊戲結果覆蓋層 -->
-    <div id="game-result-overlay" class="game-result-overlay" style="display: none;">
-        <h2 id="winner-text"></h2>
-        <p id="player-final-score"></p>
-        <p id="banker-final-score"></p>
-        <p id="result-profit-loss"></p>
-        <button id="play-again-button">再玩一次</button>
-    </div>
 </div>
+
+<div id="game-phase-overlay" class="game-phase-overlay" style="display: none;">
+    <h2 id="game-phase-text"></h2>
+    <div id="shuffle-animation" class="shuffle-animation" style="display: none;">🃏</div>
+</div>
+
+<div id="game-result-overlay" class="game-result-overlay" style="display: none;">
+    <h2 id="winner-text"></h2>
+    <p id="player-final-score"></p>
+    <p id="banker-final-score"></p>
+    <p id="result-profit-loss"></p>
+</div>
+
 {% endblock %}
 
 {% block extra_js %}
 <script src="https://cdnjs.cloudflare.com/ajax/libs/socket.io/4.0.1/socket.io.js"></script>
 <script>
-    document.addEventListener('DOMContentLoaded', function() {
-        const socket = io({
-            transports: ['websocket'],
-            upgrade: false,
-            reconnection: true,
-            reconnectionAttempts: 5,
-            reconnectionDelay: 1000,
-            timeout: 60000
-        });
+document.addEventListener('DOMContentLoaded', function() {
+    const socket = io({
+        transports: ['websocket'],
+        upgrade: false,
+        reconnection: true,
+        reconnectionAttempts: 5,
+        reconnectionDelay: 1000,
+        timeout: 60000
+    });
 
-        socket.on('connect', () => {
-            console.log('Connected to server');
-            document.getElementById('connection-status').textContent = '已連接';
-            document.getElementById('connection-status').style.color = '#4CAF50';
-        });
-
-        socket.on('connect_error', (error) => {
-            console.error('Connection error:', error);
-            document.getElementById('connection-status').textContent = '連接錯誤';
-            document.getElementById('connection-status').style.color = '#f44336';
-        });
-
-        socket.on('disconnect', () => {
-            console.log('Disconnected from server');
-            document.getElementById('connection-status').textContent = '已斷開';
-            document.getElementById('connection-status').style.color = '#f44336';
-        });
-
-        let gamePhase = 'waiting';
-        let currentBet = null;
-        let timeLeft = 0;
-        let countdownInterval = null;
-        let hintTimeout = null;
-
-        function startCountdown() {
-            if (countdownInterval) {
-                clearInterval(countdownInterval);
-            }
-            countdownInterval = setInterval(() => {
-                if (timeLeft > 0) {
-                    timeLeft--;
-                    document.getElementById('time-left').textContent = `${timeLeft} 秒`;
-                } else {
-                    clearInterval(countdownInterval);
-                }
-            }, 1000);
-        }
-
-        socket.on('game_state', (data) => {
-            console.log('Received game state:', data);
-            
-            const gamePhaseOverlay = document.getElementById('game-phase-overlay');
-            const gamePhaseText = document.getElementById('game-phase-text');
-            const bettingArea = document.getElementById('betting-area');
-            const shuffleAnimation = document.getElementById('shuffle-animation');
-            const gameResultOverlay = document.getElementById('game-result-overlay');
-
-            console.log('Current phase:', data.phase);
-
-            updateGameInfo(data);
-            
-            const prevGamePhase = gamePhase;
-            gamePhase = data.phase;
-
-            if (hintTimeout) {
-                clearTimeout(hintTimeout);
-                hintTimeout = null;
-            }
-
-            if (gamePhase === 'dealing') {
-                gamePhaseOverlay.style.display = 'none';
-                bettingArea.style.display = 'none';
-                shuffleAnimation.style.display = 'none';
-                gameResultOverlay.style.display = 'none';
-                gamePhaseText.textContent = '';
-                updateCards(data);
-                clearInterval(countdownInterval);
-                console.log('Dealing phase - gamePhaseOverlay display:', gamePhaseOverlay.style.display);
-            } else if (gamePhase === 'result') {
-                gamePhaseOverlay.style.display = 'none';
-                bettingArea.style.display = 'none';
-                shuffleAnimation.style.display = 'none';
-                gameResultOverlay.style.display = 'flex';
-                gamePhaseText.textContent = '';
-                showResult(data);
-                clearInterval(countdownInterval);
-                console.log('Result phase - gamePhaseOverlay display:', gamePhaseOverlay.style.display);
-            } else if (gamePhase === 'betting') {
-                bettingArea.style.display = 'flex';
-                gameResultOverlay.style.display = 'none';
-
-                if (prevGamePhase !== 'betting') {
-                    gamePhaseOverlay.style.display = 'flex';
-                    gamePhaseText.textContent = '請下注';
-                    shuffleAnimation.style.display = 'block';
-                    
-                    hintTimeout = setTimeout(() => {
-                        gamePhaseOverlay.style.display = 'none';
-                        shuffleAnimation.style.display = 'none';
-                        hintTimeout = null;
-                    }, 3000);
-                }
-
-                document.querySelectorAll('.bet-option .btn').forEach(button => {
-                    button.disabled = false;
-                });
-                
-                currentBet = null;
-                timeLeft = data.time_left;
-                startCountdown();
-                console.log('Betting phase - gamePhaseOverlay display:', gamePhaseOverlay.style.display);
-            }
-        });
-
-        socket.on('balance_update', (data) => {
-            console.log('Received balance update:', data);
-            document.getElementById('balance').textContent = `餘額: ${data.balance}`;
-        });
-
-        socket.on('error', (error) => {
-            console.error('WebSocket error:', error);
-            alert('發生錯誤：' + error);
-        });
-
-        function placeBet(type, amount) {
-            if (gamePhase !== 'betting') {
-                alert('現在不是下注時間！');
-                return;
-            }
-
-            const betAmount = parseInt(amount);
-            if (isNaN(betAmount) || betAmount <= 0) {
-                alert('請輸入有效的下注金額！');
-                return;
-            }
-
-            currentBet = {
-                type: type,
-                amount: betAmount
-            };
-
-            document.querySelectorAll('.bet-option .btn').forEach(button => {
-                button.disabled = true;
-            });
-            document.querySelectorAll('.bet-option').forEach(option => {
-                if (option.dataset.type === type) {
-                    option.classList.add('active');
-                } else {
-                    option.classList.remove('active');
-                }
-            });
-
-            socket.emit('place_bet', currentBet);
-            console.log('Placed bet:', currentBet);
-        }
-
-        function showResult(data) {
-            const resultOverlay = document.getElementById('game-result-overlay');
-            const winnerText = document.getElementById('winner-text');
-            const playerFinalScore = document.getElementById('player-final-score');
-            const bankerFinalScore = document.getElementById('banker-final-score');
-            const resultProfitLoss = document.getElementById('result-profit-loss');
-            const playAgainButton = document.getElementById('play-again-button');
-            const gamePhaseOverlay = document.getElementById('game-phase-overlay');
-            gamePhaseOverlay.style.display = 'none';
-
-            let resultMessage = '';
-            if (data.results && data.results.winner) {
-                if (data.results.winner === 'player') {
-                    resultMessage = '閒家勝！';
-                } else if (data.results.winner === 'banker') {
-                    resultMessage = '莊家勝！';
-                } else if (data.results.winner === 'tie') {
-                    resultMessage = '和局！';
-                }
-            }
-
-            winnerText.textContent = resultMessage;
-            if (data.results) {
-                playerFinalScore.textContent = `閒家點數：${data.results.player_score}`;
-                bankerFinalScore.textContent = `莊家點數：${data.results.banker_score}`;
-            }
-
-            resultProfitLoss.innerHTML = '';
-            if (data.profit !== undefined) {
-                const profitText = document.createElement('p');
-                if (data.profit > 0) {
-                    profitText.textContent = `贏得 ${data.profit} 籌碼！`;
-                    profitText.classList.add('profit-positive');
-                } else if (data.profit < 0) {
-                    profitText.textContent = `損失 ${Math.abs(data.profit)} 籌碼`;
-                    profitText.classList.add('profit-negative');
-                } else {
-                    profitText.textContent = '本局平手';
-                    profitText.style.color = '#ffffff';
-                }
-                resultProfitLoss.appendChild(profitText);
-            }
-
-            const specialResults = [];
-            if (data.banker_cards && data.banker_cards.length >= 2 &&
-                data.banker_cards[0].value === data.banker_cards[1].value) {
-                specialResults.push('莊家對子');
-            }
-            if (data.player_cards && data.player_cards.length >= 2 &&
-                data.player_cards[0].value === data.player_cards[1].value) {
-                specialResults.push('閒家對子');
-            }
-
-            if (specialResults.length > 0) {
-                const specialText = document.createElement('p');
-                specialText.textContent = specialResults.join('、');
-                specialText.style.color = 'gold';
-                resultProfitLoss.appendChild(specialText);
-            }
-
-            resultOverlay.style.display = 'block';
-            playAgainButton.textContent = '準備下一局';
-        }
-
-        document.querySelectorAll('.bet-option').forEach(option => {
-            const btn = option.querySelector('.btn');
-            const input = option.querySelector('input');
+    // 初始化遊戲狀態
+    let gamePhase = 'waiting';
+    let currentBet = null;
+    let timeLeft = 20;
+    
+    // 綁定下注按鈕事件
+    document.querySelectorAll('.bet-option').forEach(option => {
+        const button = option.querySelector('.btn');
+        const input = option.querySelector('input');
+        
+        button.addEventListener('click', () => {
+            const amount = parseInt(input.value);
             const type = option.dataset.type;
-
-            btn.addEventListener('click', () => {
-                const amount = parseInt(input.value);
-                if (amount < 500) {
-                    alert('最低投注額為500');
-                    return;
-                }
-                placeBet(type, amount);
-            });
+            placeBet(type, amount);
         });
+    });
 
-        function createCardElement(card, isFlipped = false) {
-            const cardElement = document.createElement('div');
-            cardElement.classList.add('card');
-            if (isFlipped) {
-                cardElement.classList.add('flipped');
-            }
+    // Socket.IO 事件處理
+    socket.on('connect', () => {
+        console.log('Connected to server');
+        document.getElementById('connection-status').textContent = '已連接';
+        document.getElementById('connection-status').style.color = '#4CAF50';
+    });
 
-            const cardInner = document.createElement('div');
-            cardInner.classList.add('card-inner');
+    socket.on('connect_error', (error) => {
+        console.error('Connection error:', error);
+        document.getElementById('connection-status').textContent = '連接錯誤';
+        document.getElementById('connection-status').style.color = '#f44336';
+    });
 
-            const cardFront = document.createElement('div');
-            cardFront.classList.add('card-front');
-            const rank = document.createElement('div');
-            rank.classList.add('card-rank');
-            rank.textContent = card.rank;
-            const suit = document.createElement('div');
-            suit.classList.add('card-suit');
-            suit.textContent = getSuitSymbol(card.suit);
-            suit.style.color = (card.suit === '♥' || card.suit === '♦') ? 'red' : 'black';
-            cardFront.appendChild(rank);
-            cardFront.appendChild(suit);
+    socket.on('disconnect', () => {
+        console.log('Disconnected from server');
+        document.getElementById('connection-status').textContent = '已斷開';
+        document.getElementById('connection-status').style.color = '#f44336';
+    });
 
-            const cardBack = document.createElement('div');
-            cardBack.classList.add('card-back');
-            cardBack.textContent = 'BAK';
+    socket.on('game_state', (data) => {
+        console.log('Received game state:', data);
+        updateGameState(data);
+    });
 
-            cardInner.appendChild(cardFront);
-            cardInner.appendChild(cardBack);
-            cardElement.appendChild(cardInner);
+    socket.on('new_round', (data) => {
+        console.log('New round started:', data);
+        resetGameState();
+        updateGameState(data);
+    });
 
-            return cardElement;
+    socket.on('deal_card', (data) => {
+        console.log('Dealing card:', data);
+        const cardArea = document.getElementById(`${data.area}-cards`);
+        const card = createCardElement(data.card);
+        cardArea.appendChild(card);
+        setTimeout(() => card.classList.add('dealt'), 100);
+    });
+
+    socket.on('update_scores', (data) => {
+        console.log('Updating scores:', data);
+        if (data.player_score !== undefined) {
+            document.getElementById('player-score').textContent = `點數: ${data.player_score}`;
         }
-
-        function getSuitSymbol(suit) {
-            switch (suit) {
-                case '♠': return '♠';
-                case '♥': return '♥';
-                case '♦': return '♦';
-                case '♣': return '♣';
-                default: return '';
-            }
-        }
-
-        function updateGameInfo(data) {
-            document.getElementById('time-left').textContent = `倒數: ${data.time_left} 秒`;
-            if (data.player_current_score !== undefined) {
-                document.getElementById('player-score').textContent = `閒家點數: ${data.player_current_score}`;
-            }
-            if (data.banker_current_score !== undefined) {
-                document.getElementById('banker-score').textContent = `莊家點數: ${data.banker_current_score}`;
-            }
-
-            if (data.phase === 'betting') {
-                document.getElementById('player-cards').innerHTML = '';
-                document.getElementById('banker-cards').innerHTML = '';
-            }
-        }
-
-        function updateGamePhase(phase) {
-            // This function is now mostly empty as hint display is handled in game_state and new_round directly.
-        }
-
-        socket.on('new_round', function(data) {
-            console.log('New Round:', data);
-            console.log('new_round called. Resetting UI...');
-            updateGameInfo(data);
-            document.getElementById('player-cards').innerHTML = '';
-            document.getElementById('banker-cards').innerHTML = '';
-            
-            const gamePhaseOverlay = document.getElementById('game-phase-overlay');
-            const gamePhaseText = document.getElementById('game-phase-text');
-            const bettingArea = document.getElementById('betting-area');
-            const shuffleAnimation = document.getElementById('shuffle-animation');
-            const gameResultOverlay = document.getElementById('game-result-overlay');
-
-            gameResultOverlay.style.display = 'none';
-
-            gamePhaseOverlay.style.display = 'flex';
-            gamePhaseText.textContent = '請下注';
-            bettingArea.style.display = 'flex';
-            shuffleAnimation.style.display = 'block';
-
-            if (hintTimeout) clearTimeout(hintTimeout);
-            hintTimeout = setTimeout(() => {
-                gamePhaseOverlay.style.display = 'none';
-                shuffleAnimation.style.display = 'none';
-                hintTimeout = null;
-            }, 3000);
-
-            document.querySelectorAll('.bet-option').forEach(option => {
-                option.classList.remove('active');
-            });
-            document.querySelectorAll('.bet-option .btn').forEach(button => {
-                button.disabled = false;
-            });
-            currentBet = null;
-            
-            timeLeft = data.time_left;
-            startCountdown();
-
-            console.log('new_round completed. gamePhaseOverlay display:', gamePhaseOverlay.style.display);
-            console.log('new_round completed. gameResultOverlay display:', gameResultOverlay.style.display);
-        });
-
-        socket.on('deal_card', function(data) {
-            console.log('Deal Card:', data);
-            const cardArea = document.getElementById(`${data.area}-cards`);
-            const newCardElement = createCardElement(data.card);
-
-            newCardElement.style.transform = 'translateY(-200px) rotateY(0deg)';
-            newCardElement.style.opacity = '0';
-
-            cardArea.appendChild(newCardElement);
-
-            setTimeout(() => {
-                newCardElement.style.transition = 'transform 0.5s ease-out, opacity 0.5s ease-out';
-                newCardElement.style.transform = 'translateY(0) rotateY(0deg)';
-                newCardElement.style.opacity = '1';
-
-                setTimeout(() => {
-                    newCardElement.classList.add('flipped');
-                }, 300);
-            }, 50);
-        });
-
-        socket.on('update_scores', function(data) {
-            if (data.player_score !== undefined) {
-                document.getElementById('player-score').textContent = `閒家點數: ${data.player_score}`;
-            }
-            if (data.banker_score !== undefined) {
-                document.getElementById('banker-score').textContent = `莊家點數: ${data.banker_score}`;
-            }
-            console.log('Scores updated.', data);
-        });
-
-        socket.on('message', function(msg) {
-            const messagesElement = document.getElementById('messages');
-            const p = document.createElement('p');
-            p.textContent = msg;
-            messagesElement.appendChild(p);
-            messagesElement.scrollTop = messagesElement.scrollHeight;
-        });
-
-        socket.on('leaderboard_update', (data) => {
-            console.log('Leaderboard update:', data);
-            const leaderboardList = document.getElementById('leaderboard-list');
-            leaderboardList.innerHTML = '';
-            data.forEach((player, index) => {
-                const playerElement = document.createElement('div');
-                playerElement.textContent = `${index + 1}. ${player.username}: ${player.total_winnings}`;
-                leaderboardList.appendChild(playerElement);
-            });
-        });
-
-        function updateCards(data) {
-            const playerCardsArea = document.getElementById('player-cards');
-            const bankerCardsArea = document.getElementById('banker-cards');
-
-            playerCardsArea.innerHTML = '';
-            bankerCardsArea.innerHTML = '';
-
-            let delay = 0;
-            const cardDealDelay = 300;
-
-            if (data.player_cards && data.player_cards.length > 0) {
-                data.player_cards.forEach((card, index) => {
-                    setTimeout(() => {
-                        const newCardElement = createCardElement(card);
-                        playerCardsArea.appendChild(newCardElement);
-                        setTimeout(() => {
-                            newCardElement.classList.add('flipped');
-                        }, 50);
-                    }, delay);
-                    delay += cardDealDelay;
-                });
-            }
-
-            if (data.banker_cards && data.banker_cards.length > 0) {
-                data.banker_cards.forEach((card, index) => {
-                    setTimeout(() => {
-                        const newCardElement = createCardElement(card);
-                        bankerCardsArea.appendChild(newCardElement);
-                        setTimeout(() => {
-                            newCardElement.classList.add('flipped');
-                        }, 50);
-                    }, delay);
-                    delay += cardDealDelay;
-                });
-            }
+        if (data.banker_score !== undefined) {
+            document.getElementById('banker-score').textContent = `點數: ${data.banker_score}`;
         }
     });
+
+    socket.on('balance_update', (data) => {
+        console.log('Balance updated:', data);
+        document.getElementById('balance').textContent = data.balance;
+    });
+
+    socket.on('leaderboard_update', (data) => {
+        console.log('Leaderboard updated:', data);
+        updateLeaderboard(data);
+    });
+
+    // 遊戲功能函數
+    function updateGameState(data) {
+        gamePhase = data.phase;
+        timeLeft = data.time_left;
+        
+        document.getElementById('time-left').textContent = timeLeft;
+        
+        const bettingArea = document.getElementById('betting-area');
+        const gamePhaseOverlay = document.getElementById('game-phase-overlay');
+        const gameResultOverlay = document.getElementById('game-result-overlay');
+        
+        if (gamePhase === 'betting') {
+            bettingArea.style.display = 'flex';
+            gamePhaseOverlay.style.display = 'none';
+            gameResultOverlay.style.display = 'none';
+            enableBetting();
+        } else if (gamePhase === 'dealing') {
+            bettingArea.style.display = 'none';
+            gamePhaseOverlay.style.display = 'none';
+            gameResultOverlay.style.display = 'none';
+            disableBetting();
+        } else if (gamePhase === 'result') {
+            showResult(data);
+        }
+    }
+
+    function resetGameState() {
+        document.getElementById('player-cards').innerHTML = '';
+        document.getElementById('banker-cards').innerHTML = '';
+        document.getElementById('player-score').textContent = '';
+        document.getElementById('banker-score').textContent = '';
+        currentBet = null;
+        enableBetting();
+    }
+
+    function enableBetting() {
+        document.querySelectorAll('.bet-option .btn').forEach(button => {
+            button.disabled = false;
+        });
+    }
+
+    function disableBetting() {
+        document.querySelectorAll('.bet-option .btn').forEach(button => {
+            button.disabled = true;
+        });
+    }
+
+    function placeBet(type, amount) {
+        if (gamePhase !== 'betting') {
+            alert('現在不是下注時間！');
+            return;
+        }
+
+        if (isNaN(amount) || amount < 500) {
+            alert('最低下注金額為500！');
+            return;
+        }
+
+        socket.emit('place_bet', {
+            type: type,
+            amount: amount
+        });
+
+        currentBet = { type, amount };
+        disableBetting();
+    }
+
+    function createCardElement(card) {
+        const cardDiv = document.createElement('div');
+        cardDiv.className = 'card';
+        
+        const cardInner = document.createElement('div');
+        cardInner.className = 'card-inner';
+        
+        const cardFront = document.createElement('div');
+        cardFront.className = 'card-front';
+        cardFront.innerHTML = `
+            <div class="card-rank">${card.value}</div>
+            <div class="card-suit">${card.suit}</div>
+        `;
+        
+        const cardBack = document.createElement('div');
+        cardBack.className = 'card-back';
+        cardBack.textContent = '🎴';
+        
+        cardInner.appendChild(cardFront);
+        cardInner.appendChild(cardBack);
+        cardDiv.appendChild(cardInner);
+        
+        return cardDiv;
+    }
+
+    function showResult(data) {
+        const gameResultOverlay = document.getElementById('game-result-overlay');
+        const winnerText = document.getElementById('winner-text');
+        const playerScore = document.getElementById('player-final-score');
+        const bankerScore = document.getElementById('banker-final-score');
+        
+        if (data.results) {
+            gameResultOverlay.style.display = 'flex';
+            winnerText.textContent = `獲勝方: ${data.results.winner === 'banker' ? '莊家' : data.results.winner === 'player' ? '閒家' : '和局'}`;
+            playerScore.textContent = `閒家最終點數: ${data.results.player_score}`;
+            bankerScore.textContent = `莊家最終點數: ${data.results.banker_score}`;
+        }
+    }
+
+    function updateLeaderboard(data) {
+        const leaderboardList = document.getElementById('leaderboard-list');
+        leaderboardList.innerHTML = '';
+        data.forEach((player, index) => {
+            const playerElement = document.createElement('div');
+            playerElement.textContent = `${index + 1}. ${player.username}: ${player.total_winnings}`;
+            leaderboardList.appendChild(playerElement);
+        });
+    }
+});
 </script>
 {% endblock %}

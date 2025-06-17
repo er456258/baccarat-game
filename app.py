@@ -421,32 +421,26 @@ def init_deck():
     """初始化牌組"""
     suits = ['♠', '♥', '♦', '♣']
     values = ['A', '2', '3', '4', '5', '6', '7', '8', '9', '10', 'J', 'Q', 'K']
-    deck = []
-    for _ in range(8):  # 8副牌
-        for suit in suits:
-            for value in values:
-                # Add a rank attribute for display on the card front
-                rank_for_display = value
-                deck.append({'suit': suit, 'value': value, 'rank': rank_for_display})
+    deck = [{'suit': suit, 'value': value} for suit in suits for value in values]
     random.shuffle(deck)
     return deck
 
-@app.route('/api/game/state')
-def get_game_state():
-    return jsonify(game_state)
-
-# 確保數據庫目錄存在
 def ensure_db_dir_exists():
-    db_path = os.path.dirname(app.config['SQLALCHEMY_DATABASE_URI'].replace('sqlite:///', ''))
-    if db_path and not os.path.exists(db_path):
-        os.makedirs(db_path)
+    """確保數據庫目錄存在"""
+    db_dir = os.path.dirname(app.config['SQLALCHEMY_DATABASE_URI'].replace('sqlite:///', ''))
+    if db_dir and not os.path.exists(db_dir):
+        os.makedirs(db_dir)
 
-# 初始化數據庫
 def init_db():
+    """初始化數據庫"""
+    ensure_db_dir_exists()
     with app.app_context():
-        ensure_db_dir_exists()
         db.create_all()
-        print("Database tables created successfully!")
+        # 初始化遊戲狀態
+        global game_state
+        game_state['deck'] = init_deck()
+        game_state['phase'] = 'betting'
+        game_state['time_left'] = 20
 
 # 在應用啟動時初始化數據庫
 init_db()

@@ -3,9 +3,11 @@ services:
     name: baccarat-game
     env: python
     buildCommand: pip install -r requirements.txt
-    startCommand: gunicorn app:app
+    startCommand: gunicorn -c gunicorn_config.py app:app
     envVars:
       - key: PYTHON_VERSION
         value: 3.10.0
       - key: SECRET_KEY
-        generateValue: true 
+        generateValue: true
+      - key: FLASK_ENV
+        value: production 

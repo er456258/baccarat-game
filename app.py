@@ -24,8 +24,18 @@ else:
 
 app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
 
+# 配置 Socket.IO
+socketio = SocketIO(
+    app,
+    cors_allowed_origins="*",
+    async_mode='eventlet',
+    ping_timeout=60,
+    ping_interval=25,
+    logger=True,
+    engineio_logger=True
+)
+
 db = SQLAlchemy(app)
-socketio = SocketIO(app)
 login_manager = LoginManager()
 login_manager.init_app(app)
 login_manager.login_view = 'login'
@@ -447,6 +457,12 @@ if __name__ == '__main__':
     # 啟動遊戲循環
     socketio.start_background_task(target=game_loop)
     if os.environ.get('RENDER'):
-        socketio.run(app, host='0.0.0.0', port=int(os.environ.get('PORT', 10000)))
+        port = int(os.environ.get('PORT', 10000))
+        socketio.run(app, 
+                    host='0.0.0.0', 
+                    port=port,
+                    debug=False,
+                    use_reloader=False,
+                    log_output=True)
     else:
         socketio.run(app, debug=True) 

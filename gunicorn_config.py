@@ -1,6 +1,6 @@
 bind = "0.0.0.0:10000"
 workers = 1  # WebSocket 最好只用一個 worker
-worker_class = "eventlet"
+worker_class = "gevent"
 timeout = 120
 keepalive = 120
 worker_connections = 1000

@@ -1,5 +1,5 @@
 import eventlet
-eventlet.monkey_patch() # Must be called very early
+eventlet.monkey_patch()
 
 from flask import Flask, render_template, request, jsonify, redirect, url_for
 from flask_socketio import SocketIO, emit
@@ -19,7 +19,7 @@ app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
 db = SQLAlchemy(app)
 socketio = SocketIO(app, 
                    cors_allowed_origins="*",
-                   async_mode='eventlet',
+                   async_mode='gevent',
                    ping_timeout=60,
                    ping_interval=25,
                    logger=True,

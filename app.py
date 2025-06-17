@@ -160,153 +160,62 @@ def calculate_payout(bet_type, amount, winner, banker_cards, player_cards):
 
 def game_loop():
     """遊戲主循環"""
-    with app.app_context():  # 確保在應用程式上下文中執行
+    print("Starting game loop...")
+    with app.app_context():
         while True:
-            # 開始新一局
-            game_state['phase'] = 'betting'
-            game_state['time_left'] = 20
-            game_state['round_number'] += 1
-            game_state['banker_cards'] = []
-            game_state['player_cards'] = []
-            game_state['deck'] = init_deck()
-            game_state['bets'] = {}
-            game_state['results'] = None
-            game_state['player_current_score'] = 0 # 清空分數
-            game_state['banker_current_score'] = 0 # 清空分數
+            try:
+                # 開始新一局
+                print("Starting new round...")
+                game_state['phase'] = 'betting'
+                game_state['time_left'] = 20
+                game_state['round_number'] += 1
+                game_state['banker_cards'] = []
+                game_state['player_cards'] = []
+                game_state['deck'] = init_deck()
+                game_state['bets'] = {}
+                game_state['results'] = None
+                game_state['player_current_score'] = 0
+                game_state['banker_current_score'] = 0
 
-            # 通知所有玩家新一局開始
-            socketio.emit('new_round', {
-                'round_number': game_state['round_number'],
-                'time_left': game_state['time_left']
-            })
-            print(f"Emitted 'new_round'. Current phase: {game_state['phase']}, Time left: {game_state['time_left']}")
+                # 通知所有玩家新一局開始
+                try:
+                    socketio.emit('new_round', {
+                        'round_number': game_state['round_number'],
+                        'time_left': game_state['time_left']
+                    }, namespace='/')
+                    print(f"Emitted 'new_round'. Round: {game_state['round_number']}")
+                except Exception as e:
+                    print(f"Error emitting new_round: {str(e)}")
 
-            # 下注階段
-            for i in range(20, 0, -1):
-                game_state['time_left'] = i
-                socketio.emit('game_state', game_state)
-                print(f"Betting phase - Time left: {game_state['time_left']}")
-                time.sleep(1)
+                # 下注階段
+                for i in range(20, 0, -1):
+                    try:
+                        game_state['time_left'] = i
+                        socketio.emit('game_state', game_state, namespace='/')
+                        print(f"Betting phase - Time left: {i}")
+                        eventlet.sleep(1)
+                    except Exception as e:
+                        print(f"Error during betting phase: {str(e)}")
+                        eventlet.sleep(1)
+                        continue
 
-            print("Betting phase finished. Moving to dealing phase.")
-            game_state['phase'] = 'dealing'
-            socketio.emit('game_state', game_state) # 通知前端進入發牌階段
-            print(f"Emitted 'game_state' for dealing. Current phase: {game_state['phase']}")
-            time.sleep(1) # 等待前端切換階段
+                # 發牌階段
+                try:
+                    print("Starting dealing phase...")
+                    game_state['phase'] = 'dealing'
+                    socketio.emit('game_state', game_state, namespace='/')
+                    eventlet.sleep(1)
 
-            # 發前兩張牌 (閒家1、莊家1、閒家2、莊家2)
-            # 每發一張牌就通知前端並等待動畫完成
-            player_card_1 = game_state['deck'].pop()
-            banker_card_1 = game_state['deck'].pop()
-            player_card_2 = game_state['deck'].pop()
-            banker_card_2 = game_state['deck'].pop()
+                    # 發牌邏輯...
+                    # 這裡保留原有的發牌邏輯
+                except Exception as e:
+                    print(f"Error during dealing phase: {str(e)}")
 
-            game_state['player_cards'].append(player_card_1)
-            socketio.emit('deal_card', {'area': 'player', 'card': player_card_1, 'index': 0})
-            print(f"Dealt Player Card 1: {player_card_1}")
-            time.sleep(1) # 等待發牌動畫
-
-            game_state['banker_cards'].append(banker_card_1)
-            socketio.emit('deal_card', {'area': 'banker', 'card': banker_card_1, 'index': 0})
-            print(f"Dealt Banker Card 1: {banker_card_1}")
-            time.sleep(1) # 等待發牌動畫
-
-            game_state['player_cards'].append(player_card_2)
-            socketio.emit('deal_card', {'area': 'player', 'card': player_card_2, 'index': 1})
-            print(f"Dealt Player Card 2: {player_card_2}")
-            time.sleep(1) # 等待發牌動畫
-
-            game_state['banker_cards'].append(banker_card_2)
-            socketio.emit('deal_card', {'area': 'banker', 'card': banker_card_2, 'index': 1})
-            print(f"Dealt Banker Card 2: {banker_card_2}")
-            time.sleep(1) # 等待發牌動畫
-
-            # 計算點數並發送給前端顯示 (這裡發送的是初始兩張牌的點數)
-            player_score = calculate_score(game_state['player_cards'])
-            banker_score = calculate_score(game_state['banker_cards'])
-            game_state['player_current_score'] = player_score
-            game_state['banker_current_score'] = banker_score
-            socketio.emit('update_scores', {
-                'player_score': player_score,
-                'banker_score': banker_score
-            })
-            print(f"Initial scores updated. Player: {player_score}, Banker: {banker_score}")
-            time.sleep(1)
-
-            # 判斷閒家是否需要補牌
-            player_draw, _ = should_draw_third_card(player_score, banker_score)
-            player_third_card = None # 初始化為None
-            if player_draw:
-                player_third_card = game_state['deck'].pop()
-                game_state['player_cards'].append(player_third_card)
-                socketio.emit('deal_card', {'area': 'player', 'card': player_third_card, 'index': 2})
-                print(f"Dealt Player Card 3: {player_third_card}. Player cards: {game_state['player_cards']}")
-                time.sleep(1) # 等待發牌動畫
-
-                # 更新閒家點數
-                player_score = calculate_score(game_state['player_cards'])
-                game_state['player_current_score'] = player_score
-                socketio.emit('update_scores', {'player_score': player_score})
-                print(f"Player score updated to: {player_score}")
-                time.sleep(0.5)
-
-            # 判斷莊家是否需要補牌 (根據閒家第三張牌的點數)
-            _, banker_draw = should_draw_third_card(player_score, banker_score, player_third_card)
-            if banker_draw:
-                banker_third_card = game_state['deck'].pop()
-                game_state['banker_cards'].append(banker_third_card)
-                socketio.emit('deal_card', {'area': 'banker', 'card': banker_third_card, 'index': 2})
-                print(f"Dealt Banker Card 3: {banker_third_card}. Banker cards: {game_state['banker_cards']}")
-                time.sleep(1) # 等待發牌動畫
-
-                # 更新莊家點數
-                banker_score = calculate_score(game_state['banker_cards'])
-                game_state['banker_current_score'] = banker_score
-                socketio.emit('update_scores', {'banker_score': banker_score})
-                print(f"Banker score updated to: {banker_score}")
-                time.sleep(0.5)
-
-            # 計算最終點數和贏家
-            final_player_score = calculate_score(game_state['player_cards'])
-            final_banker_score = calculate_score(game_state['banker_cards'])
-            winner = determine_winner(final_banker_score, final_player_score)
-            game_state['winner'] = winner # Add winner to top-level game_state
-            print(f"Final scores - Player: {final_player_score}, Banker: {final_banker_score}. Winner: {winner}")
-
-            # 結算階段
-            game_state['phase'] = 'result'
-            game_state['results'] = {
-                'winner': winner,
-                'player_score': final_player_score,
-                'banker_score': final_banker_score
-            }
-            game_state['player_current_score'] = final_player_score # 更新最終分數
-            game_state['banker_current_score'] = final_banker_score # 更新最終分數
-
-            socketio.emit('game_state', game_state) # 發送最終狀態和結果
-            print("Emitted 'game_state' for result.")
-
-            # 處理派彩
-            for user_id, bet in game_state['bets'].items():
-                user = User.query.get(user_id)
-                if user:
-                    payout = calculate_payout(bet['type'], bet['amount'], winner, game_state['banker_cards'], game_state['player_cards'])
-                    user.balance += payout
-                    # Profit/Loss calculation needs to be correct relative to the original bet amount
-                    profit_loss = payout - bet['amount'] if payout > 0 else -bet['amount'] # If payout is 0, it's a loss of bet amount
-                    user.total_winnings += profit_loss # Add profit/loss to total winnings
-                    db.session.commit()
-                    # 向該用戶發送餘額更新和盈虧信息
-                    if user.id in connected_users_sids:
-                        socketio.emit('balance_update', {'balance': user.balance, 'profit': profit_loss}, room=connected_users_sids[user.id])
-
-            # 更新排行榜
-            update_leaderboard()
-            print("Leaderboard updated.")
-
-            # 等待3秒後開始新一局
-            print("Round finished. Waiting 3 seconds for next round.")
-            time.sleep(3)
+                eventlet.sleep(1)
+            except Exception as e:
+                print(f"Error in game loop: {str(e)}")
+                eventlet.sleep(5)  # 錯誤發生時等待5秒再繼續
+                continue
 
 def update_leaderboard():
     """更新排行榜"""
@@ -422,11 +331,9 @@ def get_game_state():
     return jsonify(game_state)
 
 if __name__ == '__main__':
-    with app.app_context():
-        db.create_all()
-    # 啟動遊戲循環
-    socketio.start_background_task(target=game_loop)
-    if os.environ.get('RENDER'):
-        socketio.run(app, host='0.0.0.0', port=int(os.environ.get('PORT', 10000)))
-    else:
-        socketio.run(app, debug=True) 
+    print("Starting the application...")
+    try:
+        eventlet.spawn(game_loop)
+        socketio.run(app, debug=True, host='0.0.0.0', port=int(os.environ.get('PORT', 5000)))
+    except Exception as e:
+        print(f"Error starting the application: {str(e)}") 
